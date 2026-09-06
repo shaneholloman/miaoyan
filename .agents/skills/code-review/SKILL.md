@@ -39,7 +39,7 @@ swift-format lint --recursive . --strict
 - [ ] Follows existing patterns in the codebase
 - [ ] No unnecessary class where struct suffices
 - [ ] Uses Swift concurrency correctly (async/await, actors)
-- [ ] AppKit changes stay in the macOS app; SwiftUI changes stay in `MiaoYanMobile/` unless the task explicitly requires cross-target work
+- [ ] Keep the macOS editor core, preview pipeline, and existing storyboard scenes on AppKit; new self-contained panels may host SwiftUI through `NSHostingView`. `MiaoYanMobile/` uses SwiftUI, without sharing UI layers across targets
 - [ ] SwiftLint passes: `swiftlint lint --strict`
 - [ ] No dead code or commented-out blocks
 - [ ] Clear naming, no abbreviations
