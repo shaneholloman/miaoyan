@@ -15,7 +15,6 @@ of declared versions only).
 | ------------------------------------------------------------------ | ---------- | ------------------------------------------------------ |
 | [Sparkle](https://github.com/sparkle-project/Sparkle)              | 2.8.0+     | macOS auto-update (non-AppStore builds only)           |
 | [Highlightr](https://github.com/raspu/Highlightr)                  | 2.3.0+     | Native syntax highlighting in `Helpers/NotesTextProcessor.swift` |
-| [ZipArchive](https://github.com/ZipArchive/ZipArchive)             | 2.6.0+     | Note attachment + version archive zip/unzip            |
 | [swift-cmark-gfm](https://github.com/stackotter/swift-cmark-gfm)   | 1.0.2+     | GitHub Flavored Markdown parsing (preview + export)    |
 | [KeyboardShortcuts](https://github.com/sindresorhus/KeyboardShortcuts) | 2.4.0+ | Global keyboard shortcut registration (window activation) |
 | [Prettier](https://github.com/simonbs/Prettier.git)                | 0.2.1+     | Markdown auto-format on save                           |

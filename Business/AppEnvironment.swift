@@ -1,20 +1,7 @@
 import Foundation
 
-/// Single read-only entry point for app-level singletons.
-///
-/// Why this exists: the codebase grew several independent singletons
-/// (`Storage.sharedInstance()`, `WikilinkIndex.shared`,
-/// `NoteVersionManager.shared`, `UserDataService.instance`, etc.) and 22
-/// direct call sites that bypass `AppContext`. The cure for that is not
-/// "rip them all out" (Storage is correctly a file-system singleton, ripping
-/// it costs more than it returns), but to give new code one place to look
-/// and to make the SwiftLint custom rule meaningful.
-///
-/// Scope: macOS target only. iOS `MiaoYanMobile` has its own service
-/// composition (e.g. `CloudSyncManager`) and is not folded into this facade.
-///
-/// `AppEnvironment.current` is a facade, not a container. It does not own
-/// these objects, it merely names them.
+/// Read-only facade for macOS services. It neither owns nor replaces them.
+/// iOS composes its own services through AppState.
 @MainActor
 struct AppEnvironment {
 

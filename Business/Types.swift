@@ -70,12 +70,6 @@ extension NSAttributedString.Key {
     }
 }
 
-// MARK: - Configuration Types
-struct KeychainConfiguration {
-    static let serviceName = "MiaoYanApp"
-    static let accessGroup: String? = nil
-}
-
 // MARK: - Utility Types
 class UndoData: NSObject {
     let string: NSAttributedString

@@ -114,6 +114,5 @@ custom_rules:
       # The whole iOS target is out of scope for this macOS-only facade rule.
       - "MiaoYanMobile"
       # Tests are an explicit access boundary; using the singleton directly is
-      # fine. Once a test needs a sandboxed environment it can use
-      # `AppEnvironment.withOverride(...)`.
+      # fine. Tests must restore any shared preferences they change.
       - "MiaoYanTests"

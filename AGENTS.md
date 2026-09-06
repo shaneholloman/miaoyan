@@ -22,7 +22,7 @@ MiaoYan is a lightweight Markdown editor built with Swift. The main app is macOS
 - **Slide mode**: based on Reveal.js. `---` separators delimit slides.
 - **Note storage**: filesystem-backed with folder nesting, file-system watch, auto-save, and version history.
 - **Editor**: live preview, syntax highlight, keyboard shortcuts, Prettier-integrated auto-format.
-- **iOS target**: SwiftUI under `MiaoYanMobile/`, sharing core models in `Business/` with the macOS app.
+- **iOS target**: SwiftUI under `MiaoYanMobile/`, using its own models and services; both apps share filesystem conventions.
 
 ## Repository Map
 

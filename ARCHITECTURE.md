@@ -1,9 +1,7 @@
 # MiaoYan Architecture
 
-> This document describes the architecture as it actually exists, not as it
-> ought to be. Aspirational refactors are tracked in
-> `~/.claude/plans/9-think-magical-globe.md`, not here. When code drifts, the
-> code wins and this document is wrong; please update it.
+> This document describes the current implementation. Target membership in
+> `MiaoYan.xcodeproj/project.pbxproj` is authoritative when the code changes.
 
 ## Top-Level Map
 
@@ -27,14 +25,14 @@ A single macOS application process owns:
 - One `NSApplication` (subclass-free; `AppDelegate` is the delegate).
 - One `MainWindowController` (`Controllers/MainWindowController.swift`),
   which loads `Resources/Localization/Base.lproj/Main.storyboard`.
-- One `ViewController` (`Controllers/ViewController.swift` + four `+` extensions),
+- One `ViewController` (`Controllers/ViewController.swift` + its `+` extensions),
   the host for the sidebar / notes list / editor / preview.
 - One `WKWebView` instance per editor pane that loads
   `Resources/DownView.bundle/index.html` for live preview.
 
-The iOS target (`MiaoYanMobile/`) is a separate executable; it shares the
-`Business/` models via the same compile pool but has its own SwiftUI app entry
-point (`MiaoYanMobileApp.swift`).
+The iOS target (`MiaoYanMobile/`) is a separate executable with its own models,
+storage services, renderer, and SwiftUI entry point (`MiaoYanMobileApp.swift`).
+The apps share filesystem conventions, not the macOS `Business/` compile pool.
 
 ## Singleton & Facade Inventory
 
@@ -65,8 +63,8 @@ let storage = AppEnvironment.current.storage
 let storage = Storage.sharedInstance()
 ```
 
-`Business/AppEnvironment.swift` is a read-only facade and a substitution
-point for tests via `AppEnvironment.withOverride(...)`.
+`Business/AppEnvironment.swift` is a read-only facade over the existing
+macOS services. It does not provide test overrides.
 
 ## Storyboard Anchors (Do Not Move Without Reading This First)
 
@@ -86,8 +84,7 @@ breaks the UI at runtime without a compile-time error:
   `ViewController+Action.swift` must keep their exact ObjC selectors.
 
 If you need to split `ViewController`, leave outlets and actions on the host
-class and forward to coordinator objects from the action body. See
-`~/.claude/plans/9-think-magical-globe.md` Phase 3.
+class and forward to coordinator objects from the action body.
 
 ## Editing Pipeline (Hot Path)
 
@@ -143,11 +140,13 @@ Bundled JS used by the preview is vendored under
 
 ## iOS Target Boundary
 
-`MiaoYanMobile/` compiles into the same `MiaoYan.xcodeproj` and shares the
-`Business/` source pool. SwiftUI lives only inside `MiaoYanMobile/`; AppKit
+`MiaoYanMobile/` builds as a separate target in `MiaoYan.xcodeproj`. Its
+models and services live inside `MiaoYanMobile/`. SwiftUI lives there; AppKit
 lives only outside. There is no shared UI layer. The iOS target reads notes
 through `MiaoYanMobile/Services/FileReader.swift`, which is a parallel
-implementation to (not a thin wrapper over) the macOS storage flow.
+implementation to the macOS storage flow. `NoteSearchReader` reads complete
+local bodies in cancellable chunks and is also compiled into the macOS test
+bundle for platform-independent regression tests.
 
 ## Release & Update Path
 
@@ -171,7 +170,7 @@ implementation to (not a thin wrapper over) the macOS storage flow.
 
 ## See Also
 
-- `AGENTS.md` — agent-facing repo guide (commands, hot files, current risk areas)
-- `CLAUDE.md` — project-level overrides for Claude Code
-- `.claude/rules/swift.md` — project-level Swift conventions
-- `~/.claude/CLAUDE.md` — global rules (writing style, commit policy, git safety)
+- `AGENTS.md` - agent-facing repo guide (commands, hot files, current risk areas)
+- `CLAUDE.md` - project-level overrides for Claude Code
+- `.claude/rules/swift.md` - project-level Swift conventions
+- `~/.claude/CLAUDE.md` - global rules (writing style, commit policy, git safety)

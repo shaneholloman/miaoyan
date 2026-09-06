@@ -2,7 +2,6 @@ import Cocoa
 import Darwin
 import Foundation
 import LocalAuthentication
-import ZipArchive
 
 @MainActor
 public class Note: NSObject {
