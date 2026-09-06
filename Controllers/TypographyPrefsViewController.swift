@@ -5,25 +5,6 @@ final class TypographyPrefsViewController: BasePrefsViewController {
     private var settings = EditorSettings()
     private var fontStackView: NSStackView!
 
-    // Font types bundled with the app
-    private enum FontType: String, CaseIterable {
-        case tsanger = "TsangerJinKai02-W04"
-
-        var editorFontName: String { rawValue }
-        var windowFontName: String { rawValue }
-        var previewFontName: String { rawValue }
-
-        static func from(actualFontName: String) -> FontType? {
-            return allCases.first { t in
-                t.rawValue == actualFontName || t.editorFontName == actualFontName || t.windowFontName == actualFontName || t.previewFontName == actualFontName
-            }
-        }
-
-        var isAvailable: Bool {
-            return NSFont(name: rawValue, size: 12) != nil
-        }
-    }
-
     override func setupUI() {
         setupFontSection(in: installPreferencesStack())
     }
@@ -63,40 +44,6 @@ final class TypographyPrefsViewController: BasePrefsViewController {
             action: #selector(presentationFontSizeChanged(_:))
         )
         fontStackView.addArrangedSubview(presentationSizeRow)
-    }
-
-    private func createSectionView(in parentView: NSView, topAnchor: NSLayoutAnchor<NSLayoutYAxisAnchor>, topConstant: CGFloat, title: String? = nil) -> (container: NSView, titleLabel: NSTextField?) {
-        let containerView = NSView()
-        containerView.translatesAutoresizingMaskIntoConstraints = false
-        containerView.wantsLayer = true
-        containerView.layer?.backgroundColor = NSColor.clear.cgColor
-
-        var titleLabel: NSTextField?
-        if let title = title {
-            let label = NSTextField(labelWithString: title)
-            label.translatesAutoresizingMaskIntoConstraints = false
-            label.font = NSFont.boldSystemFont(ofSize: 13)
-            label.textColor = Theme.textColor
-            containerView.addSubview(label)
-            titleLabel = label
-        }
-
-        parentView.addSubview(containerView)
-
-        NSLayoutConstraint.activate([
-            containerView.topAnchor.constraint(equalTo: topAnchor, constant: topConstant),
-            containerView.leadingAnchor.constraint(equalTo: parentView.leadingAnchor),
-            containerView.trailingAnchor.constraint(equalTo: parentView.trailingAnchor),
-        ])
-
-        if let titleLabel {
-            NSLayoutConstraint.activate([
-                titleLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 12),
-                titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
-            ])
-        }
-
-        return (containerView, titleLabel)
     }
 
     private func createFontRow(label: String, fontAction: Selector, sizeAction: Selector) -> NSView {
@@ -156,17 +103,7 @@ final class TypographyPrefsViewController: BasePrefsViewController {
     private func setupFontPopUp(_ popUp: NSPopUpButton, currentName: String?) {
         popUp.removeAllItems()
 
-        // Known families (list by their actual face names for clarity)
-        let candidates: [FontType] = FontType.allCases
-        for font in candidates where font.isAvailable {
-            popUp.addItem(withTitle: font.editorFontName)
-        }
-
-        // Add all installed font families so user can pick more
-        let families = NSFontManager.shared.availableFontFamilies
-        for family in families.sorted() {
-            if candidates.contains(where: { $0.editorFontName == family || $0.rawValue == family }) { continue }
-            if popUp.itemTitles.contains(family) { continue }
+        for family in NSFontManager.shared.availableFontFamilies.sorted() {
             popUp.addItem(withTitle: family)
         }
 
@@ -179,16 +116,6 @@ final class TypographyPrefsViewController: BasePrefsViewController {
         if let name = currentName, !name.isEmpty {
             popUp.selectItem(withTitle: name)
         }
-    }
-
-    private func getFontType(from title: String) -> FontType? {
-        // Match by raw/editor/preview/window names only (no localized alias)
-        for t in FontType.allCases {
-            if title == t.rawValue || title == t.editorFontName || title == t.windowFontName || title == t.previewFontName {
-                return t
-            }
-        }
-        return nil
     }
 
     private func setupFontSizePopUp(_ popUp: NSPopUpButton) {
@@ -216,13 +143,6 @@ final class TypographyPrefsViewController: BasePrefsViewController {
         }
     }
 
-    private func selectFontInPopUp(_ rowView: NSView, fontType: FontType) {
-        if let fontPopUp = rowView.subviews.first(where: { $0 is NSPopUpButton }) as? NSPopUpButton {
-            // Match against actual face name we populate with
-            fontPopUp.selectItem(withTitle: fontType.editorFontName)
-        }
-    }
-
     private func selectSizeInPopUp(_ rowView: NSView, size: Int) {
         guard let sizePopUp = lastPopUpButton(in: rowView) else { return }
         sizePopUp.selectItem(withTitle: String(size))
@@ -239,7 +159,7 @@ final class TypographyPrefsViewController: BasePrefsViewController {
     // MARK: - Actions
     @objc private func editorFontChanged(_ sender: NSPopUpButton) {
         guard let item = sender.selectedItem else { return }
-        let actualFontName = getFontType(from: item.title)?.editorFontName ?? item.title
+        let actualFontName = item.title
         settings.editorFontName = actualFontName
         settings.applyChanges()
     }
@@ -252,7 +172,7 @@ final class TypographyPrefsViewController: BasePrefsViewController {
 
     @objc private func windowFontChanged(_ sender: NSPopUpButton) {
         guard let item = sender.selectedItem else { return }
-        let actualFontName = getFontType(from: item.title)?.windowFontName ?? item.title
+        let actualFontName = item.title
         if settings.windowFontName == actualFontName { return }
         settings.windowFontName = actualFontName
         // Live-apply interface font without restart
@@ -263,7 +183,7 @@ final class TypographyPrefsViewController: BasePrefsViewController {
 
     @objc private func previewFontChanged(_ sender: NSPopUpButton) {
         guard let item = sender.selectedItem else { return }
-        let actualFontName = getFontType(from: item.title)?.previewFontName ?? item.title
+        let actualFontName = item.title
         settings.previewFontName = actualFontName
         settings.applyChanges()
     }
@@ -276,7 +196,7 @@ final class TypographyPrefsViewController: BasePrefsViewController {
 
     @objc private func codeFontChanged(_ sender: NSPopUpButton) {
         guard let item = sender.selectedItem else { return }
-        let actualFontName = getFontType(from: item.title)?.editorFontName ?? item.title
+        let actualFontName = item.title
         settings.codeFontName = actualFontName
         NotesTextProcessor.codeFont = NSFont(name: settings.codeFontName, size: CGFloat(settings.editorFontSize))
         settings.applyChanges()

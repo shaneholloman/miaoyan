@@ -4,23 +4,18 @@ import Cocoa
 /// All default fonts are defined here for easy maintenance
 @MainActor
 enum FontConfiguration {
-    /// Default editor font name
-    /// Current: TsangerJinKai (elegant Chinese font)
-    /// Fallback: PingFang SC (system Chinese font)
-    static let defaultEditorFont = "TsangerJinKai02-W04"
+    /// Use installed system fonts without redistributing font files.
+    static let defaultEditorFont = "PingFangSC-Regular"
     static let fallbackFont = "PingFangSC-Regular"
 
     /// Default interface font name
-    static let defaultInterfaceFont = "TsangerJinKai02-W04"
+    static let defaultInterfaceFont = "PingFangSC-Regular"
 
     /// Default preview font name
-    static let defaultPreviewFont = "TsangerJinKai02-W04"
+    static let defaultPreviewFont = "PingFangSC-Regular"
 
     /// Default code font name
     static let defaultCodeFont = "Menlo"
-
-    /// All bundled custom fonts
-    static let bundledFonts = ["TsangerJinKai02-W04"]
 
     /// Returns the actual NSFont for editor use
     static func editorFont(size: CGFloat) -> NSFont {

@@ -98,26 +98,13 @@ class HtmlManager {
                     margin-block-start: 0 !important;
                     padding-top: 0 !important;
                 }
-                /* Headings inherit the note's own --text-font, same as the live preview.
-                   An earlier serif override here ("New York", "Songti SC", serif) resolved
-                   to STSongti-SC-Bold while the body stayed on the user's preview font, so
-                   every export shipped two unrelated typefaces glued together. Only the
-                   print-specific bits (ink color, pagination, tighter leading) stay.
-
-                   The stroke is the heading weight. TsangerJinKai ships a single weight
-                   (W04), so font-weight: bold only buys WebKit's synthetic bold, which on a
-                   kai-flavoured face still reads lighter than the real Songti Bold headings
-                   used to. Measured ink relative to body text: regular 100%, synthetic bold
-                   124%, + this stroke 130%. font-weight: 900 renders identical to bold and
-                   the family's heavier W05 cut is *lighter* than synthetic bold, so neither
-                   is a way out. Keep the stroke in em so h4-h6 do not fill their counters. */
+                /* Headings inherit the user's preview font. */
                 #export-generated-title,
                 h1, h2, h3, h4, h5, h6 {
                     color: var(--pdf-ink) !important;
                     page-break-after: avoid;
                     line-height: 1.4 !important;
                     font-weight: bold !important;
-                    -webkit-text-stroke: 0.026em currentColor !important;
                 }
                 #export-generated-title {
                     font-size: 2em !important;
@@ -738,18 +725,6 @@ class HtmlManager {
     }
 
     @MainActor
-    static func getFontPathAndMeta() -> (String, String) {
-        if UserDefaultsManagement.isOnExportHtml {
-            return (
-                "\(cdnBaseURL)/Fonts",
-                "<base href=\"\(cdnBaseURL)/DownView.bundle/\">"
-            )
-        } else {
-            return (Bundle.main.resourceURL?.path ?? "", "")
-        }
-    }
-
-    @MainActor
     static func getPPTTheme() -> String {
         let themeFile = UserDataService.instance.isDark ? "night.css" : "white.css"
         return "<link rel=\"stylesheet\" href=\"ppt/dist/theme/\(themeFile)\" id=\"theme\" />"
@@ -783,12 +758,11 @@ class HtmlManager {
 
         let template = try String(contentsOf: baseURL, encoding: .utf8)
 
-        let (fontPath, downMeta) = getFontPathAndMeta()
+        let downMeta = UserDefaultsManagement.isOnExportHtml ? "<base href=\"\(cdnBaseURL)/DownView.bundle/\">" : ""
         let customCSS = UserDataService.instance.isDark ? "darkmode" : "lightmode"
 
         var replacements: [String: String] = [
             "DOWN_CSS": css,
-            "DOWN_FONT_PATH": fontPath,
             "DOWN_META": downMeta,
             "CUSTOM_CSS": customCSS,
         ]

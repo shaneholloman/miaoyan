@@ -85,7 +85,6 @@ public enum UserDefaultsManagement {
     typealias Color = NSColor
     typealias Image = NSImage
     typealias Font = NSFont
-    static var DefaultFont = "TsangerJinKai02-W04"
     static var DefaultFontSize = 16
     static var DefaultPreviewFontSize = 16
     static var DefaultPresentationFontSize = 24
@@ -312,16 +311,23 @@ public enum UserDefaultsManagement {
     }
 
     static func migrateFontDefaultsIfNeeded() {
+        // Only migrate the retired bundled face, preserving other user choices.
+        if !UserDefaults.standard.bool(forKey: "hasMigratedSystemFonts_v1") {
+            let replacements = [
+                Constants.FontName: FontConfiguration.defaultEditorFont,
+                Constants.WindowFontName: FontConfiguration.defaultInterfaceFont,
+                Constants.PreviewFontName: FontConfiguration.defaultPreviewFont,
+                Constants.CodeFontNameKey: FontConfiguration.defaultCodeFont,
+            ]
+            for (key, font) in replacements where UserDefaults.standard.string(forKey: key) == "TsangerJinKai02-W04" {
+                UserDefaults.standard.set(font, forKey: key)
+            }
+            UserDefaults.standard.set(true, forKey: "hasMigratedSystemFonts_v1")
+        }
         if !hasMigratedCodeFontDefault {
             hasMigratedCodeFontDefault = true
-            let handwrittenCodeFonts = [
-                FontConfiguration.defaultEditorFont,
-                FontConfiguration.defaultInterfaceFont,
-                FontConfiguration.defaultPreviewFont,
-                "TsangerJinKai02-W04",
-            ]
             let storedCode = UserDefaults.standard.string(forKey: Constants.CodeFontNameKey) ?? ""
-            if storedCode.isEmpty || handwrittenCodeFonts.contains(storedCode) {
+            if storedCode.isEmpty || storedCode == "TsangerJinKai02-W04" {
                 UserDefaults.standard.set(FontConfiguration.defaultCodeFont, forKey: Constants.CodeFontNameKey)
             }
         }

@@ -98,7 +98,7 @@ class SearchTextField: NSSearchField, NSSearchFieldDelegate {
     }
 
     @MainActor private func configureSearchField() {
-        // Use the app's interface font (TsangerJinKai) for both the typed text
+        // Use the app's interface font for both the typed text
         // and the placeholder so the search field matches the rest of the UI
         // instead of falling back to the system font. The placeholder must be
         // set as an attributed string carrying this font: NSSearchFieldCell

@@ -104,7 +104,6 @@ Install the official skill with `npx skills add tw93/MiaoYan/skills/miaoyan -g`.
 - [stackotter/swift-cmark-gfm](https://github.com/stackotter/swift-cmark-gfm) - Swift Markdown parser
 - [simonbs/Prettier](https://github.com/simonbs/Prettier) - Markdown formatting utilities
 - [raspu/Highlightr](https://github.com/raspu/Highlightr) - Syntax highlighting
-- [TsangerType](https://tsanger.cn/product) - TsangerJinKai font (default font)
 - [hakimel/reveal.js](https://github.com/hakimel/reveal.js) - PPT presentation framework
 ## License
 

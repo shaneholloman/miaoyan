@@ -4,6 +4,33 @@ import XCTest
 @testable import MiaoYan
 
 final class PrefsWindowControllerTests: XCTestCase {
+    @MainActor
+    func testFontMigrationPreservesCustomFaces() throws {
+        let defaults = UserDefaults.standard
+        let keys = ["fontName", "windowFontName", "previewFontName", "codeFont", "hasMigratedSystemFonts_v1", "hasMigratedCodeFontDefault_v1", "hasMigratedFontDefaults_v2"]
+        let saved = keys.map { defaults.object(forKey: $0) }
+        defer {
+            for (key, value) in zip(keys, saved) {
+                if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+            }
+        }
+        defaults.set(false, forKey: "hasMigratedSystemFonts_v1")
+        defaults.set(true, forKey: "hasMigratedCodeFontDefault_v1")
+        defaults.set(true, forKey: "hasMigratedFontDefaults_v2")
+        defaults.set("TsangerJinKai02-W04", forKey: "fontName")
+        defaults.set("TsangerJinKai02-W04", forKey: "windowFontName")
+        defaults.set("Helvetica", forKey: "previewFontName")
+        defaults.set("Menlo", forKey: "codeFont")
+
+        UserDefaultsManagement.migrateFontDefaultsIfNeeded()
+
+        XCTAssertEqual(UserDefaultsManagement.fontName, FontConfiguration.defaultEditorFont)
+        XCTAssertEqual(UserDefaultsManagement.windowFontName, FontConfiguration.defaultInterfaceFont)
+        XCTAssertEqual(UserDefaultsManagement.previewFontName, "Helvetica")
+        XCTAssertEqual(UserDefaultsManagement.codeFontName, "Menlo")
+        XCTAssertNotNil(NSFont(name: FontConfiguration.defaultEditorFont, size: 16))
+    }
+
     func testWindowAppearanceDoesNotOverwriteTheSavedPreviewMode() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: root.appendingPathComponent("Controllers/ViewController.swift"), encoding: .utf8)

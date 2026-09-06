@@ -135,7 +135,7 @@ function getMermaidConfig(isDark = false) {
     themeVariables: extendedColors,
     darkMode: isDark,
     fontSize: 15,
-    fontFamily: "'TsangerJinKai02-W04', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', Arial, sans-serif",
+    fontFamily: "-apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', Arial, sans-serif",
     flowchart: {
       useMaxWidth: true,
       htmlLabels: true,
