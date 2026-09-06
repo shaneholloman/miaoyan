@@ -332,8 +332,6 @@ class ViewController:
         addProjectButton?.alphaValue = showOnHover ? 0 : 1
     }
 
-    @objc func detachedWindowWillClose(notification: NSNotification) {}
-
     deinit {
         // Clean up scroll sync resources
         if let observer = splitScrollObserver {
@@ -445,8 +443,9 @@ class ViewController:
 
     // Handle webview performance impact from long-term inactivity
     override func viewDidDisappear() {
-        super.viewWillDisappear()
+        super.viewDidDisappear()
         removeLiveResizeObserver()
+        disablePreviewWorkItem?.cancel()
         if sessionPreviewMode {
             disablePreviewWorkItem = DispatchWorkItem { [weak self] in
                 self?.needRestorePreview = true
@@ -461,9 +460,9 @@ class ViewController:
 
     override func viewWillAppear() {
         super.viewWillAppear()
+        disablePreviewWorkItem?.cancel()
+        disablePreviewWorkItem = nil
         applyLegacySidebarWidthFixIfNeeded()
-        // Preview mode will be enabled manually by user when needed
-        // No longer auto-restore preview mode to simplify startup and avoid state issues
     }
 
     override func viewDidAppear() {
@@ -498,11 +497,9 @@ class ViewController:
         handleForAppMode()
         applyEditorModePreferenceChange()
 
-        // Always start in edit mode for simplicity and reliability
-        // User can manually enable preview mode with keyboard shortcut if needed
-        if sessionPreviewMode {
-            // Reset preview flag to ensure clean edit mode startup
-            sessionPreviewMode = false
+        if sessionPreviewMode || needRestorePreview {
+            needRestorePreview = false
+            enablePreview()
         }
 
         DispatchQueue.main.async { [weak self] in
