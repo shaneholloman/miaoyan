@@ -94,12 +94,6 @@ enum NoteFileStore {
     private static let ignoredFolderNames: Set<String> = ["i", "files", ".Trash", "Trash"]
     private static let previewByteLimit = 900
     private static let recentNoteLimit = 40
-    /// Bytes read off disk for search snippet matching. Most matches in
-    /// Markdown notes occur near the head (titles, intros, keywords).
-    /// Reading 16KB instead of the whole file (and bypassing
-    /// NSFileCoordinator) drops a 1500-note search from several seconds
-    /// to <1s.
-    private static let searchReadByteLimit = 16 * 1024
 
     // MARK: - Preview noise stripping
 
@@ -236,29 +230,6 @@ enum NoteFileStore {
         guard let re = emphasisRegex else { return input }
         let full = NSRange(location: 0, length: (input as NSString).length)
         return re.stringByReplacingMatches(in: input, range: full, withTemplate: "")
-    }
-
-    /// Read up to `maxBytes` from a file via plain FileHandle, no
-    /// NSFileCoordinator. Used only by search snippet scanning where:
-    ///  - the read is read-only and short-lived
-    ///  - per-file coordinator overhead (~10-50ms) dominates over
-    ///    the actual IO cost for 16KB reads
-    ///  - the caller has already verified the file is local (not an
-    ///    iCloud placeholder)
-    /// Do NOT use this for content the user opens, those still go
-    /// through `coordinatedReadString` for write-conflict safety.
-    nonisolated static func readFirstBytes(at url: URL, maxBytes: Int) -> String? {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
-        defer { try? handle.close() }
-        guard var data = try? handle.read(upToCount: maxBytes), !data.isEmpty else { return nil }
-        if let s = String(data: data, encoding: .utf8) { return s }
-        // Truncation may split a multi-byte UTF-8 sequence (CJK = 3 bytes,
-        // emoji = 4 bytes). Trim up to 3 trailing bytes to find a valid boundary.
-        for _ in 0..<3 {
-            data.removeLast()
-            if let s = String(data: data, encoding: .utf8) { return s }
-        }
-        return nil
     }
 
     // MARK: - Folders
@@ -774,10 +745,8 @@ enum NoteFileStore {
     ///     block while iCloud downloads each file, freezing the UI for
     ///     seconds per file. Users learn about skipped files via
     ///     `skippedDownloadingCount` so they can wait or refresh.
-    ///  3. Each file body read is capped at `searchReadByteLimit` (16KB)
-    ///     and bypasses NSFileCoordinator (`readFirstBytes`). For 1500
-    ///     notes this drops total IO from "full read x coordinator"
-    ///     (multi-second) to "16KB head x raw FileHandle" (sub-second).
+    ///  3. Read complete local bodies in cancellable chunks so long notes
+    ///     remain searchable beyond their opening paragraphs.
     ///  4. Probes run in parallel capped at `searchMaxConcurrent`.
     static func search(query: String, in root: URL) async -> SearchOutcome {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -789,7 +758,8 @@ enum NoteFileStore {
         // Fallback: disk enumeration (non-iCloud roots, or pre-init).
         let cloudURLs = await CloudSyncManager.shared.cloudNoteURLs(under: root)
 
-        return await Task.detached(priority: .userInitiated) { () -> SearchOutcome in
+        let worker = Task.detached(priority: .userInitiated) { () -> SearchOutcome in
+            guard !Task.isCancelled else { return SearchOutcome(hits: [], skippedDownloadingCount: 0) }
             let urls = cloudURLs.isEmpty ? recursiveNoteURLsSync(in: root) : cloudURLs
             let opts: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
 
@@ -836,12 +806,18 @@ enum NoteFileStore {
                 hits.sort { $0.0.modifiedDate > $1.0.modifiedDate }
                 return SearchOutcome(hits: hits, skippedDownloadingCount: skipped)
             }
-        }.value
+        }
+        return await withTaskCancellationHandler {
+            await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
     }
 
     nonisolated private static func searchSingleFile(
         url: URL, query: String, options: String.CompareOptions
     ) -> SearchHitResult {
+        guard !Task.isCancelled else { return .noMatch }
         // Skip files that aren't downloaded yet. nil status = non-iCloud
         // (always proceed). Anything other than `.current` means the file
         // body isn't local, opening it would trigger a blocking download.
@@ -855,23 +831,21 @@ enum NoteFileStore {
         let title = url.deletingPathExtension().lastPathComponent
         let titleHit = title.range(of: query, options: options) != nil
 
-        // Read only the head of the file (16KB by default) and bypass
-        // NSFileCoordinator. The body scan only needs enough text for
-        // matching + snippet, full reads via coordinator dominate the
-        // search latency for large libraries. See `readFirstBytes` doc.
-        guard let head = readFirstBytes(at: url, maxBytes: searchReadByteLimit) else {
+        // Empty or unreadable bodies must not hide a matching filename.
+        guard let body = try? NoteSearchReader.read(url) else {
+            if titleHit, !Task.isCancelled {
+                return .hit(NoteFile(url: url, preview: ""), snippet: "")
+            }
             return .noMatch
         }
 
-        let bodyHit = head.range(of: query, options: options) != nil
+        guard !Task.isCancelled else { return .noMatch }
+        let bodyHit = body.range(of: query, options: options) != nil
         // Title-only match still counts as a hit even if the body doesn't
         // contain the query; snippet falls back to the body's opening line.
         guard titleHit || bodyHit else { return .noMatch }
 
-        // `extractSnippet` re-finds the match in the cleaned text, so
-        // passing `knownRange` (which referred to the raw `head`) would
-        // be misleading, drop it.
-        let snippet = extractSnippet(from: head, query: query)
+        let snippet = extractSnippet(from: body, query: query)
         return .hit(NoteFile(url: url, preview: ""), snippet: snippet)
     }
 
@@ -897,6 +871,7 @@ enum NoteFileStore {
 
         var urls: [URL] = []
         for case let url as URL in enumerator {
+            if Task.isCancelled { break }
             if isDirectory(url) {
                 let name = url.lastPathComponent
                 if ignoredFolderNames.contains(name) || name.hasPrefix(".") {
@@ -1006,28 +981,26 @@ enum NoteFileStore {
         return joined.isEmpty ? "Untitled" : joined
     }
 
-    /// Extract a 140-ish-character window around a match. If `knownRange` is
-    /// supplied (caller already located the match), skip the redundant
-    /// `range(of:)` rescan, that doubles search cost for every hit.
-    /// `knownRange` is intentionally ignored now: it referred to the raw
-    /// body text, but we always operate on `stripPreviewNoise(content)`
-    /// which has different offsets. Re-finding the query in the cleaned
-    /// text is cheap (cleaned text is shorter and we already filtered
-    /// out non-matches upstream).
+    /// Match again after Markdown cleanup, whose offsets differ from the source.
     nonisolated private static func extractSnippet(
-        from content: String, query: String, knownRange: Range<String.Index>? = nil
+        from content: String, query: String
     ) -> String {
         let opts: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
         var cleaned = stripMarkdownMarkers(content)
         cleaned = stripPreviewNoise(cleaned)
         cleaned = stripEmphasisMarkers(cleaned)
+        if let whitespaceRunRegex {
+            cleaned = whitespaceRunRegex.stringByReplacingMatches(
+                in: cleaned, range: NSRange(location: 0, length: (cleaned as NSString).length), withTemplate: " ")
+        }
         guard let range = cleaned.range(of: query, options: opts) else {
             // Title-only match (no body hit), fall back to a clean
             // opening snippet rather than echoing raw markdown.
             return String(cleaned.prefix(140))
         }
         let startDistance = cleaned.distance(from: cleaned.startIndex, to: range.lowerBound)
-        let prefixStart = max(0, startDistance - 48)
+        // Keep the match visible within the card's two-line summary, including CJK.
+        let prefixStart = max(0, startDistance - 24)
         let startIndex = cleaned.index(cleaned.startIndex, offsetBy: prefixStart)
         let endDistance = min(cleaned.count, startDistance + query.count + 96)
         let endIndex = cleaned.index(cleaned.startIndex, offsetBy: endDistance)
