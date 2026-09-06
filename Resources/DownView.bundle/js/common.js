@@ -284,7 +284,7 @@ const MiaoYanCommon = {
       nodesToUpdate.push(currentNode);
     }
 
-    const currencyRegex = /^\$([0-9]+(?:[.,][0-9]+)?)(?=$|[^0-9A-Za-z+\-*/=<>^_\\])/;
+    const currencyRegex = /^\$(?![0-9]+(?:[.,][0-9]+)?[$(])([0-9]+(?:[.,][0-9]+)?)(?=$|[^0-9A-Za-z+\-*/=<>^_\\])/;
 
     nodesToUpdate.forEach(node => {
       const text = node.textContent;

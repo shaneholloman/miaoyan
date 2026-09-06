@@ -1,3 +1,4 @@
+import JavaScriptCore
 import WebKit
 import XCTest
 
@@ -10,6 +11,26 @@ private let nestedUnderbraceFormula =
     + "\n" + #"$$"#
 
 final class HtmlManagerTests: XCTestCase {
+    func testPreviewCurrencyGuardPreservesNumericMath() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Resources/DownView.bundle/js/common.js"), encoding: .utf8)
+        let declaration = try XCTUnwrap(
+            source.components(separatedBy: .newlines).first {
+                $0.trimmingCharacters(in: .whitespaces).hasPrefix("const currencyRegex = ")
+            })
+        let context = try XCTUnwrap(JSContext())
+        context.evaluateScript(declaration)
+        for formula in ["$0$", "$1$", "$0.25$", "$100$", "$2(k-2)$"] {
+            context.setObject(formula, forKeyedSubscript: "sample" as NSString)
+            XCTAssertFalse(try XCTUnwrap(context.evaluateScript("currencyRegex.test(sample)")).toBool(), formula)
+        }
+        for price in ["$100", "$0.25 per item", "$100, today"] {
+            context.setObject(price, forKeyedSubscript: "sample" as NSString)
+            XCTAssertTrue(try XCTUnwrap(context.evaluateScript("currencyRegex.test(sample)")).toBool(), price)
+        }
+        XCTAssertNil(context.exception)
+    }
+
     private var tempDirectory: URL!
 
     override func setUpWithError() throws {
@@ -152,6 +173,47 @@ final class HtmlManagerTests: XCTestCase {
         XCTAssertEqual(
             protectMarkdownMath("`<script>$code_math$</script>`"),
             "`<script>$code_math$</script>`")
+    }
+
+    func testNumericOnlyMathDoesNotConsumeFollowingMarkdownBlocks() throws {
+        let markdown = #"""
+            - Write $0$ if they agree.
+            - Write $1$ if they disagree.
+
+            The disagreement distance is $0.25$.
+
+            ## Counts
+
+            | Symbol | Example |
+            | ------ | ------- |
+            | $n$    | $100$ variables |
+            """#
+        let html = try XCTUnwrap(
+            renderMarkdownHTML(markdown: markdown, useGithubLineBreak: false)
+        )
+
+        XCTAssertEqual(html.components(separatedBy: "<li").count - 1, 2)
+        XCTAssertTrue(html.contains("<h2"))
+        XCTAssertTrue(html.contains("<table"))
+        XCTAssertTrue(html.contains("$0.25$"))
+        XCTAssertTrue(html.contains("$100$"))
+    }
+
+    func testCoefficientParenthesisMathDoesNotConsumeFollowingTable() throws {
+        let markdown = #"""
+            $2(k-2)$
+
+            | Symbol | Meaning |
+            | ------ | ------- |
+            | $n$    | Number of variables |
+            """#
+        let html = try XCTUnwrap(
+            renderMarkdownHTML(markdown: markdown, useGithubLineBreak: false)
+        )
+
+        XCTAssertTrue(html.contains("<table"))
+        XCTAssertTrue(html.contains("$2(k-2)$"))
+        XCTAssertTrue(html.contains("$n$"))
     }
 
     func testPPTPreparationUsesTheSharedMathProtection() {
